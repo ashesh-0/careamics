@@ -6,7 +6,7 @@ working_directory: n2v_bsd_test
 
 # Optional
 # Absolute or relative (wrt working_directory) path to model
-# trained_model: best_model.pth
+# trained_model: 
 
 algorithm:
   # Loss, currently only n2v is supported
@@ -31,7 +31,7 @@ algorithm:
 
 training:
   # Number of epochs, greater or equal than 1
-  num_epochs: 500
+  num_epochs: 10
 
   # Patch size, 2D or 3D, divisible by 2
   patch_size: [64, 64]
@@ -72,9 +72,9 @@ training:
   num_workers: 0
 
   # Optional, automatic mixed precision
-  # amp:
+  amp:
   #   # Use (True or False)
-  #   use: True
+    use: True
 
   #   # Optional, scaling parameter for mixed precision training, power of 2 recommended.
   #   # minimum is 512, maximum is 65536
@@ -88,9 +88,9 @@ data:
   axes: SYX
 
   # Optional, path to the data, absolute or relative to working_directory
-  training_path: data/BSD68_reproducibility/BSD68_reproducibility_data/train
-  validation_path: data/BSD68_reproducibility/BSD68_reproducibility_data/val
-  prediction_path: data/BSD68_reproducibility/BSD68_reproducibility_data/test
+  training_path: ../data/BSD68_reproducibility/BSD68_reproducibility_data/train
+  validation_path: ../data/BSD68_reproducibility/BSD68_reproducibility_data/val
+  prediction_path: ../data/BSD68_reproducibility/BSD68_reproducibility_data/test
 
   # Optional, mean/std of the dataset
   # mean = Null
@@ -102,7 +102,7 @@ prediction:
   use_tiling: True
 
   # Tile shape for tiled prediction, 2D or 3D, divisible by 2
-  tile_shape: [128, 128]
+  tile_shape: [64, 64]
 
   # Overlap for tiled prediction, 2D or 3D, divisible by 2, smaller than tile shape
   overlaps: [48, 48]
