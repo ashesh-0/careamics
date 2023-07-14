@@ -82,18 +82,23 @@ class TiffDataset(torch.utils.data.IterableDataset):
         return len(self.files)
 
     def __iter__(self):
-        for file_path in self.files:
-            sample = self.read_sample(file_path)
-            if len(self.axes) != len(sample.shape):
-                raise ValueError(
-                    f"Incorrect axes length (got {self.axes} for file {file_path})."
-                )
+        worker_info = torch.utils.data.get_worker_info()
+        worker_id = worker_info.id if worker_info is not None else 0
+        num_workers = worker_info.num_workers if worker_info is not None else 1
 
-            sample = self.fix_shape(sample)
+        for i, file_path in enumerate(self.files):
+            if i % num_workers == worker_id:
+                sample = self.read_sample(file_path)
+                if len(self.axes) != len(sample.shape):
+                    raise ValueError(
+                        f"Incorrect axes length (got {self.axes} for file {file_path})."
+                    )
 
-            if self.transforms is not None:
-                sample = self.transforms(sample)
+                sample = self.fix_shape(sample)
 
-            sample = normalize(sample, self.mean, self.std)
+                if self.transforms is not None:
+                    sample = self.transforms(sample)
 
-            yield sample
+                sample = normalize(sample, self.mean, self.std)
+
+                yield sample
