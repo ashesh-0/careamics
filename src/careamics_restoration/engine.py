@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from careamics_restoration.utils.logging import ProgressLogger, get_logger
 
 from .config import load_configuration
-from .dataset.tiff_dataset import (
+from .dataset.dataset_factory import (
     get_prediction_dataset,
     get_train_dataset,
     get_validation_dataset,
@@ -96,7 +96,7 @@ class Engine:
                 self.cfg.data.mean = train_loader.dataset.mean
                 self.cfg.data.std = train_loader.dataset.std
 
-            eval_loader = self.get_val_dataloader()
+            #eval_loader = self.get_val_dataloader()
 
             optimizer, lr_scheduler = self.get_optimizer_and_scheduler()
             scaler = self.get_grad_scaler()

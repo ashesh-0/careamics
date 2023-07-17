@@ -164,8 +164,6 @@ class TiffDataset(torch.utils.data.IterableDataset):
         # TODO pass stage here to be more explicit with logging
         return result_mean, result_std
 
-    # TODO Jean-Paul: get rid of numpy for now
-
     def fix_axes(self, sample: np.ndarray) -> np.ndarray:
         # concatenate ST axes to N, return NCZYX
         if ("S" in self.axes or "T" in self.axes) and sample.dtype != "O":
@@ -257,79 +255,3 @@ class TiffDataset(torch.utils.data.IterableDataset):
                     item = np.expand_dims(item, (0, 1))
                     item = normalize(item, self.mean, self.std)
                     yield item
-
-
-def get_train_dataset(config: Configuration) -> TiffDataset:
-    """
-    Create TiffDataset instance from configuration.
-
-    Yields
-    ------
-    TiffDataset
-    """
-    if config.training is None:
-        raise ValueError("Training configuration is not defined.")
-
-    data_path = config.data.training_path
-
-    dataset = TiffDataset(
-        data_path=data_path,
-        data_format=config.data.data_format,
-        axes=config.data.axes,
-        mean=config.data.mean,
-        std=config.data.std,
-        patch_extraction_method=config.training.extraction_strategy,
-        patch_size=config.training.patch_size,
-        patch_transform=default_manipulate,
-        patch_transform_params={
-            "mask_pixel_percentage": config.algorithm.masked_pixel_percentage
-        },
-    )
-    return dataset
-
-
-def get_validation_dataset(config: Configuration) -> TiffDataset:
-    if config.training is None:
-        raise ValueError("Training configuration is not defined.")
-
-    data_path = config.data.validation_path
-
-    dataset = TiffDataset(
-        data_path=data_path,
-        data_format=config.data.data_format,
-        axes=config.data.axes,
-        mean=config.data.mean,
-        std=config.data.std,
-        patch_extraction_method=config.training.extraction_strategy,
-        patch_size=config.training.patch_size,
-        patch_transform=default_manipulate,
-        patch_transform_params={
-            "mask_pixel_percentage": config.algorithm.masked_pixel_percentage
-        },
-    )
-
-    return dataset
-
-
-def get_prediction_dataset(config: Configuration) -> TiffDataset:
-    if config.prediction is None:
-        raise ValueError("Prediction configuration is not defined.")
-
-    if config.prediction.use_tiling:
-        patch_extraction_method = ExtractionStrategies.TILED
-    else:
-        patch_extraction_method = None
-
-    dataset = TiffDataset(
-        data_path=config.data.prediction_path,
-        data_format=config.data.data_format,
-        axes=config.data.axes,
-        mean=config.data.mean,
-        std=config.data.std,
-        patch_size=config.prediction.tile_shape,
-        patch_overlap=config.prediction.overlaps,
-        patch_extraction_method=patch_extraction_method,
-        patch_transform=None,
-    )
-
-    return dataset
