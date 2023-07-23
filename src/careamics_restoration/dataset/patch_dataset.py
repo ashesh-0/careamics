@@ -4,8 +4,8 @@ import torch
 from careamics_restoration.config.training import ExtractionStrategies
 from careamics_restoration.dataset.tiling import (
     extract_patches_predict,
-    extract_patches_sequential,
     extract_patches_random,
+    extract_patches_sequential,
 )
 from careamics_restoration.utils.logging import get_logger
 
@@ -20,11 +20,13 @@ extration_strategies = {
 
 
 class PatchDataset(torch.utils.data.IterableDataset):
+    """Dataset for patch-based training."""
+
     def __init__(
         self,
         dataset,
         patch_extraction_method=None,
-        patch_exrtaction_kwargs=None,
+        patch_extraction_kwargs=None,
         patch_transform=None,
         patch_transform_params=None,
     ):
@@ -32,8 +34,8 @@ class PatchDataset(torch.utils.data.IterableDataset):
 
         self.patch_extraction_method = patch_extraction_method
 
-        self.patch_size = patch_exrtaction_kwargs['patch_size']
-        self.patch_overlap = patch_exrtaction_kwargs.get('overlaps', None)
+        self.patch_size = patch_extraction_kwargs.get('patch_size', None)
+        self.patch_overlap = patch_extraction_kwargs.get('overlaps', None)
         self.patch_transform = patch_transform
         self.patch_transform_params = patch_transform_params
 
@@ -42,6 +44,7 @@ class PatchDataset(torch.utils.data.IterableDataset):
 
     # TODO: remove
     def generate_patches(self, sample: np.ndarray):
+        """Generate patches from a sample."""
         patches = None
 
         if self.patch_extraction_method == ExtractionStrategies.TILED:
@@ -61,6 +64,7 @@ class PatchDataset(torch.utils.data.IterableDataset):
         return patches
 
     def __iter__(self):
+        """Iterate over data source and yield single patch."""
         for sample in self.dataset:
             if self.patch_extraction_method:
                 # TODO: move S and T unpacking logic from patch generator

@@ -10,7 +10,7 @@ logger = get_logger(__name__)
 
 
 def _compute_number_of_patches(
-    arr: np.ndarray, patch_sizes: Tuple[int]
+    arr: np.ndarray, patch_sizes: Tuple[int, ...]
 ) -> Tuple[int, ...]:
     """Compute a number of patches in each dimension in order to covert the whole array.
 
@@ -35,7 +35,7 @@ def _compute_number_of_patches(
     return tuple(n_patches)
 
 
-def compute_overlap(arr: np.ndarray, patch_sizes: Tuple[int]) -> Tuple[int, ...]:
+def compute_overlap(arr: np.ndarray, patch_sizes: Tuple[int, ...]) -> Tuple[int, ...]:
     """Compute the overlap between patches in each dimension.
 
     Array must be of dimensions C(Z)YX, and patches must be of dimensions YX or ZYX.
@@ -117,7 +117,8 @@ def compute_crop_and_stitch_coords_1d(
                     else tile_size,
                 )
             )
-        # If the tile does not fit within the axis, perform the abovementioned operations starting from the end of the axis
+        # If the tile does not fit within the axis, perform the abovementioned
+        # operations starting from the end of the axis
         else:
             # if (axis_size - tile_size, axis_size) not in crop_coords:
             crop_coords.append((axis_size - tile_size, axis_size))
@@ -182,11 +183,35 @@ def compute_reshaped_view(
     return patches
 
 
+def patches_sanity_check(
+    arr: np.ndarray, patch_size: Tuple[int, ...], is_3d_patch: bool
+):
+    """Different asserts for patch sizes."""
+    if len(patch_size) != len(arr.shape[1:]):
+        raise ValueError(
+            f"There must be a patch size for each spatial dimensions "
+            f"(got {patch_size} patches for dims {arr.shape})."
+        )
+
+    # Sanity checks on patch sizes versus array dimension
+    if is_3d_patch and patch_size[0] > arr.shape[-3]:
+        raise ValueError(
+            f"Z patch size is inconsistent with image shape "
+            f"(got {patch_size[0]} patches for dim {arr.shape[1]})."
+        )
+
+    if patch_size[-2] > arr.shape[-2] or patch_size[-1] > arr.shape[-1]:
+        raise ValueError(
+            f"At least one of YX patch dimensions is inconsistent with image shape "
+            f"(got {patch_size} patches for dims {arr.shape[-2:]})."
+        )
+
+
 # TODO: this function does not ensure full coverage (see tests)
 # formerly :
 # https://github.com/juglab-torch/n2v/blob/00d536cdc5f5cd4bb34c65a777940e6e453f4a93/src/n2v/dataloader.py#L52
 def extract_patches_sequential(
-    arr: np.ndarray, patch_size: Tuple[int]
+    arr: np.ndarray, patch_size: Tuple[int, ...]
 ) -> Generator[np.ndarray, None, None]:
     """Generate patches from an array.
 
@@ -216,34 +241,9 @@ def extract_patches_sequential(
         less than 2
     """
     # Patches sanity check
-    if len(patch_size) != len(arr.shape[1:]):
-        raise ValueError(
-            f"There must be a patch size for each spatial dimensions "
-            f"(got {patch_size} patches for dims {arr.shape})."
-        )
-
-    for p in patch_size:
-        # check if 1
-        if p < 2:
-            raise ValueError(f"Invalid patch value (got {p}).")
-
-        # check if power of two
-        if not (p & (p - 1) == 0):
-            raise ValueError(f"Patch size must be a power of two (got {p}).")
-
-    # Sanity checks on patch sizes versus array dimension
     is_3d_patch = len(patch_size) == 3
-    if is_3d_patch and patch_size[0] > arr.shape[-3]:
-        raise ValueError(
-            f"Z patch size is inconsistent with image shape "
-            f"(got {patch_size[0]} patches for dim {arr.shape[1]})."
-        )
 
-    if patch_size[-2] > arr.shape[-2] or patch_size[-1] > arr.shape[-1]:
-        raise ValueError(
-            f"At least one of YX patch dimensions is inconsistent with image shape "
-            f"(got {patch_size} patches for dims {arr.shape[-2:]})."
-        )
+    patches_sanity_check(arr, patch_size, is_3d_patch)
 
     # Compute overlap
     overlaps = compute_overlap(arr=arr, patch_sizes=patch_size)
@@ -274,7 +274,6 @@ def extract_patches_sequential(
         yield patch
 
 
-# TODO: extract patches random default number of patches 1 or max? parameter for number of patches?
 # TODO: extract patches random but with the possibility to remove (almost) empty patches
 def extract_patches_random(
     arr: np.ndarray, patch_size: Tuple[int], seed: int = 42
@@ -298,6 +297,11 @@ def extract_patches_random(
     Generator[np.ndarray, None, None]
         generator of patches
     """
+    is_3d_patch = len(patch_size) == 3
+
+    # Patches sanity check
+    patches_sanity_check(arr, patch_size, is_3d_patch)
+
     rng = np.random.default_rng()
     # shuffle the array along the first axis TODO do we need shuffling?
     rng.shuffle(arr, axis=0)
@@ -328,33 +332,29 @@ def extract_patches_random(
             yield patch
 
 
-def extract_patches_predict(
+def extract_tiles(
     arr: np.ndarray,
-    patch_size: Tuple[int],
+    tile_size: Tuple[int],
     overlaps: Tuple[int],
-) -> Iterable[List[np.ndarray]]:
-    """_summary_.
-
-    _extended_summary_
+) -> Iterable[Tuple[np.ndarray]]:
+    """Extracts tiles or specified size from input array with specified overlap.
 
     Parameters
     ----------
     arr : np.ndarray
-        _description_
+        Array of shape (S, (Z), Y, X)
     patch_size : Tuple[int]
-        _description_
+        Tuple of tile sizes in each dimension, could be of size 2 or 3, depending on
+        the input shape
     overlaps : Tuple[int]
-        _description_
-
-    Returns
-    -------
-    Iterable[List[np.ndarray]]
-        _description_
+        Tuple of overlap values in each dimension, could be of size 2 or 3, depending
+        on the input shape
 
     Yields
     ------
     Iterator[Iterable[List[np.ndarray]]]
-        _description_
+        Tile with corresponding coordinates for cropping the overlap region from
+        the prediction and stitching the tiles back together across each axis
     """
     # Iterate over num samples (S)
     for sample_idx in range(arr.shape[0]):
@@ -363,9 +363,9 @@ def extract_patches_predict(
         # Shape: (axes, type_of_coord, tile_num, start/end coord)
         crop_and_stitch_coords_list = [
             compute_crop_and_stitch_coords_1d(
-                sample.shape[i], patch_size[i], overlaps[i]
+                sample.shape[i], tile_size[i], overlaps[i]
             )
-            for i in range(len(patch_size))
+            for i in range(len(tile_size))
         ]
         # Rearrange crop coordinates from a list of coordinate pairs per axis to a list
         # grouped by type
@@ -378,7 +378,6 @@ def extract_patches_predict(
         # will output ([(0, 32), (3, 35)], [(0, 20), (20, 35)], [(0, 20), (17, 32)]),
         # where the first list is crop coordinates for 1st axis.
 
-        # TODO review this description, move this to separate function?
         all_crop_coords, all_stitch_coords, all_overlap_crop_coords = zip(
             *crop_and_stitch_coords_list
         )

@@ -11,9 +11,8 @@ from careamics_restoration.config import Configuration
 from careamics_restoration.config.algorithm import Algorithm
 from careamics_restoration.config.data import Data
 from careamics_restoration.config.prediction import Prediction
-from careamics_restoration.config.training import Training, Optimizer, LrScheduler
+from careamics_restoration.config.training import LrScheduler, Optimizer, Training
 from careamics_restoration.engine import Engine
-
 
 TEST_IMAGE_SIZE = (128, 128)
 TEST_PATCH_SIZE = (64, 64)
@@ -41,7 +40,9 @@ def example_data_path(temp_dir: Path) -> Tuple[Path, Path]:
 
 
 @pytest.fixture
-def base_configuration(temp_dir: Path, example_data_path: Tuple[Path, Path]) -> Configuration:
+def base_configuration(
+    temp_dir: Path, example_data_path: Tuple[Path, Path]
+) -> Configuration:
     train_dir, val_dir = example_data_path
     configuration = Configuration(
         experiment_name="smoke_test",
@@ -63,6 +64,7 @@ def base_configuration(temp_dir: Path, example_data_path: Tuple[Path, Path]) -> 
             extraction_strategy="random",
             augmentation=True,
             num_workers=0,
+            use_wandb=False,
         ),
         prediction=Prediction(use_tiling=False),
     )
@@ -82,10 +84,7 @@ def test_is_engine_runnable(base_configuration: Configuration):
     """
     Test if basic workflow does not fail - train model and then predict
     """
-    # TODO: remove when engine accepts configuration in init
-    config_path = dump_config(base_configuration)
-
-    engine = Engine(config_path)
+    engine = Engine(config=base_configuration)
     engine.train()
 
     model_name = f"{engine.cfg.experiment_name}_best.pth"
