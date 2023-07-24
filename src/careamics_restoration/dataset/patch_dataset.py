@@ -3,9 +3,9 @@ import torch
 
 from careamics_restoration.config.training import ExtractionStrategies
 from careamics_restoration.dataset.tiling import (
-    extract_patches_predict,
     extract_patches_random,
     extract_patches_sequential,
+    extract_tiles,
 )
 from careamics_restoration.utils.logging import get_logger
 
@@ -13,7 +13,7 @@ LOGGER = get_logger(__name__)
 
 
 extration_strategies = {
-    ExtractionStrategies.TILED: extract_patches_predict,
+    ExtractionStrategies.TILED: extract_tiles,
     ExtractionStrategies.SEQUENTIAL: extract_patches_sequential,
     ExtractionStrategies.RANDOM: extract_patches_random,
 }
@@ -48,7 +48,7 @@ class PatchDataset(torch.utils.data.IterableDataset):
         patches = None
 
         if self.patch_extraction_method == ExtractionStrategies.TILED:
-            patches = extract_patches_predict(
+            patches = extract_tiles(
                 sample, patch_size=self.patch_size, overlaps=self.patch_overlap
             )
 

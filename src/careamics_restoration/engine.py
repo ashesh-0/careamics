@@ -146,7 +146,7 @@ class Engine:
                     train_loader.dataset.mean, train_loader.dataset.std
                 )
 
-            #eval_loader = self.get_val_dataloader()
+            eval_loader = self.get_val_dataloader()
 
             self.logger.info(
                 f"Starting training for {self.cfg.training.num_epochs} epochs"
