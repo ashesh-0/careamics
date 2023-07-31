@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from careamics_restoration.utils.logging import ProgressLogger, get_logger
 
 from .config import Configuration, load_configuration
-from .dataset.create_dataset import (
+from .dataset.tiff_dataset import (
     get_prediction_dataset,
     get_train_dataset,
     get_validation_dataset,
@@ -299,6 +299,8 @@ class Engine:
         *,
         external_input: Optional[np.ndarray] = None,
         pred_path: Optional[str] = None,
+        mean: Optional[float] = None,
+        std: Optional[float] = None,
     ) -> np.ndarray:
         """Predict using the Engine's model.
 
@@ -326,7 +328,7 @@ class Engine:
         assert self.cfg.data is not None, "Missing data entry in configuration."  # mypy
 
         # Check that the mean and std are there (= has been trained)
-        if not self.cfg.data.mean or not self.cfg.data.std:
+        if not (self.cfg.data.mean or not self.cfg.data.std) or not (mean or std):
             raise ValueError(
                 "Mean or std are not specified in the configuration, prediction cannot "
                 "be performed"
@@ -345,7 +347,7 @@ class Engine:
 
         if external_input is not None:
             pred_loader, stitch = self.get_predict_dataloader(
-                external_input=external_input
+                external_input=external_input, mean=mean, std=std
             )
         else:
             # we have a path
@@ -465,6 +467,8 @@ class Engine:
         *,
         external_input: Optional[np.ndarray] = None,
         pred_path: Optional[str] = None,
+        mean: Optional[float] = None,
+        std: Optional[float] = None,
     ) -> Tuple[DataLoader, bool]:
         """Return a prediction dataloader.
 
@@ -486,6 +490,10 @@ class Engine:
         assert self.cfg is not None, "Missing configuration."  # mypy
 
         if external_input is not None:
+            # Override mean and std if provided
+            if mean is not None and std is not None:
+                self.cfg.data.mean = mean
+                self.cfg.data.std = std
             assert (
                 self.cfg.data.mean is not None and self.cfg.data.std is not None
             ), "Missing data entry in configuration."  # mypy

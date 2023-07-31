@@ -175,6 +175,8 @@ class TiffDataset(torch.utils.data.IterableDataset):
         # TODO pass stage here to be more explicit with logging
         return result_mean, result_std
 
+    # TODO Jean-Paul: get rid of numpy for now
+
     def fix_axes(self, sample: np.ndarray) -> np.ndarray:
         """Fixes axes of the sample to match the config axes.
 
