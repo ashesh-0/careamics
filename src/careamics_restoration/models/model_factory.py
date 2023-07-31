@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple
+from typing import Dict, Optional, Tuple, Union
 
 import torch
 
@@ -23,54 +23,112 @@ def model_registry(model_name: str) -> torch.nn.Module:
     if model_name == Models.UNET:
         return UNet
     else:
-        raise NotImplementedError(f"Model {model_name} not implemented")
+        raise NotImplementedError(f"Model {model_name} is not implemented")
 
 
-def create_model(config: Configuration) -> torch.nn.Module:
-    """Builds a model based on the model_name or load a checkpoint.
+def create_model(
+    *,
+    config: Optional[Configuration] = None,
+    model_path: Optional[Union[str, Path]] = None,
+    device: Optional[torch.device] = None,
+) -> torch.nn.Module:
+    """Creates a model from a configuration file or a checkpoint.
+
+    One of `config` or `model_path` must be provided. If both are provided, only
+    `model_path` is used.
 
     Parameters
     ----------
-    config : Dict
-        Config file dictionary
-    """
-    algo_config = config.algorithm
-    model_config = algo_config.model_parameters
-    model_name = algo_config.model
+    config : Optional[Configuration], optional
+        Configuration object, by default None
+    model_path : Optional[Union[str, Path]], optional
+        Path to a checkpoint, by default None
 
-    load_checkpoint = config.trained_model
-    model = model_registry(model_name)(
-        depth=model_config.depth,
-        conv_dim=algo_config.get_conv_dim(),
-        num_channels_init=model_config.num_channels_init,
-    )
-    if load_checkpoint is not None:
-        checkpoint = torch.load(load_checkpoint)
-        if "model_state_dict" in checkpoint:
-            logger.info("Trying to load model state dict")
-            model.load_state_dict(checkpoint["model_state_dict"])
-            logger.info(f"Loaded model from {Path(load_checkpoint).name}")
+    Returns
+    -------
+    # TODO wrong return type
+    torch.nn.Module
+        Model object
+
+
+    Raises
+    ------
+    ValueError
+        If neither config nor model_path is provided
+    """
+    if model_path is not None:
+        # Create model from checkpoint
+        model_path = Path(model_path)
+        if not model_path.exists() or not model_path.suffix == ".pth":
+            raise ValueError(f"Invalid model path: {model_path}")
+
+        # Load checkpoint
+        checkpoint = torch.load(model_path, map_location=device)
+
+        # Load the configuration
+        if "config" in checkpoint:
+            config = Configuration(**checkpoint["config"])
+            algo_config = config.algorithm
+            model_config = algo_config.model_parameters
+            model_name = algo_config.model
         else:
-            # TODO: add jit, onxx, etc.
+            raise ValueError("Invalid checkpoint format, no configuration found.")
+
+        # Create model
+        model = model_registry(model_name)(
+            depth=model_config.depth,
+            conv_dim=algo_config.get_conv_dim(),
+            num_channels_init=model_config.num_channels_init,
+        )
+        model.to(device)
+        # Load the model state dict
+        if "model_state_dict" in checkpoint:
+            model.load_state_dict(checkpoint["model_state_dict"])
+        else:
             raise ValueError("Invalid checkpoint format")
 
-        logger.info(f"Loaded model from {Path(load_checkpoint).name}")
-        if "config" in checkpoint:
-            config.data.mean = checkpoint["config"]["data"]["mean"]
-            config.data.std = checkpoint["config"]["data"]["std"]
-            logger.info("Updated config from checkpoint")
-            # TODO discuss other updates
-    optimizer, scheduler = get_optimizer_and_scheduler(
-        config, model, state_dict=checkpoint if load_checkpoint else None
-    )
-    scaler = get_grad_scaler(config, state_dict=checkpoint if load_checkpoint else None)
+        # Load the optimizer and scheduler
+        optimizer, scheduler = get_optimizer_and_scheduler(
+            config, model, state_dict=checkpoint
+        )
+        scaler = get_grad_scaler(config, state_dict=checkpoint)
+
+    elif config is not None:
+        # Create model from configuration
+        algo_config = config.algorithm
+        model_config = algo_config.model_parameters
+        model_name = algo_config.model
+
+        # Create model
+        model = model_registry(model_name)(
+            depth=model_config.depth,
+            conv_dim=algo_config.get_conv_dim(),
+            num_channels_init=model_config.num_channels_init,
+        )
+        model.to(device)
+        assert config is not None, "Configuration must be provided"  # mypy
+        optimizer, scheduler = get_optimizer_and_scheduler(config, model)
+        scaler = get_grad_scaler(config)
+
+    else:
+        raise ValueError("Either config or model_path must be provided")
+
     return model, optimizer, scheduler, scaler, config
 
 
 def get_optimizer_and_scheduler(
-    cfg, model, state_dict=None
+    config: Configuration, model: torch.nn.Module, state_dict: Optional[Dict] = None
 ) -> Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler]:
     """Creates optimizer and learning rate scheduler objects.
+
+    Parameters
+    ----------
+    config : Configuration
+        Configuration object
+    model : torch.nn.Module
+        Model object
+    state_dict : Optional[Dict], optional
+        State dict of the checkpoint, by default None
 
     Returns
     -------
@@ -81,18 +139,18 @@ def get_optimizer_and_scheduler(
     ValueError
         If the entry is missing in the configuration file.
     """
-    if cfg.training is not None:
+    if config.training is not None:
         # retrieve optimizer name and parameters from config
-        optimizer_name = cfg.training.optimizer.name
-        optimizer_params = cfg.training.optimizer.parameters
+        optimizer_name = config.training.optimizer.name
+        optimizer_params = config.training.optimizer.parameters
 
         # then instantiate it
         optimizer_func = getattr(torch.optim, optimizer_name)
         optimizer = optimizer_func(model.parameters(), **optimizer_params)
 
         # same for learning rate scheduler
-        scheduler_name = cfg.training.lr_scheduler.name
-        scheduler_params = cfg.training.lr_scheduler.parameters
+        scheduler_name = config.training.lr_scheduler.name
+        scheduler_params = config.training.lr_scheduler.parameters
         scheduler_func = getattr(torch.optim.lr_scheduler, scheduler_name)
         scheduler = scheduler_func(optimizer, **scheduler_params)
 
@@ -118,7 +176,9 @@ def get_optimizer_and_scheduler(
         raise ValueError("Missing training entry in configuration file.")
 
 
-def get_grad_scaler(cfg, state_dict=None) -> torch.cuda.amp.GradScaler:
+def get_grad_scaler(
+    cfg: Configuration, state_dict: Optional[Dict] = None
+) -> torch.cuda.amp.GradScaler:
     """Create the gradscaler object.
 
     Returns
