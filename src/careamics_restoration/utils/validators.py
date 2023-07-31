@@ -84,8 +84,7 @@ def check_array_validity(array: np.ndarray, axes: str) -> None:
     axes : str
         Valid axes (see check_axes_validity)
     """
-    # TODO discuss that one
-    if len(array.shape) - 2 != len(axes):
+    if len(array.shape) != len(axes):
         raise ValueError(
             f"Array has {len(array.shape)} dimensions, but axes are {len(axes)}."
         )
