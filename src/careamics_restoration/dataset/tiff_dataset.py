@@ -1,10 +1,10 @@
 import logging
 from pathlib import Path
-from typing import Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 import tifffile
-import torch
+from torch.utils.data import IterableDataset, get_worker_info
 
 from careamics_restoration.config import Configuration
 from careamics_restoration.config.training import ExtractionStrategies
@@ -20,7 +20,27 @@ from careamics_restoration.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class TiffDataset(torch.utils.data.IterableDataset):
+class ShuffleIterableDataset(IterableDataset):
+    """Dataset that supports shuffling within a buffer size.
+
+    Parameters
+    ----------
+    dataset : IterableDataset
+    """
+
+    def __iter__(self) -> Iterator:
+        """Iterate over all samples."""
+        shuffle_buffer = []
+
+        for dataset in self.datasets:
+            assert isinstance(
+                dataset, IterableDataset
+            ), "Only IterableDataset are supported"
+            for data in dataset:
+                yield data
+
+
+class TiffDataset(IterableDataset):
     """Dataset to extract patches from a tiff image(s).
 
     Parameters
@@ -255,7 +275,7 @@ class TiffDataset(torch.utils.data.IterableDataset):
         # dataset object
         # Configuring each copy independently to avoid having duplicate data returned
         # from the workers
-        worker_info = torch.utils.data.get_worker_info()
+        worker_info = get_worker_info()
         worker_id = worker_info.id if worker_info is not None else 0
         num_workers = worker_info.num_workers if worker_info is not None else 1
 

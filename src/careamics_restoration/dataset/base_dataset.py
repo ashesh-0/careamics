@@ -1,9 +1,13 @@
 from typing import List
 
+import numpy as np
 import tifffile
+from torch.utils.data import ConcatDataset, Dataset
+
+from careamics_restoration.dataset.tensor_dataset import InMemoryDataset
 
 
-class StorageDataset:
+class LocalStorageDataset:
     """Dataset class for locally stored files."""
 
     def __init__(self) -> None:
@@ -11,13 +15,17 @@ class StorageDataset:
         self.is3d = False
 
     @staticmethod
-    def from_memory():
+    def from_memory(cfg, images: List[np.ndarray]) -> List[Dataset]:
         """Create dataset from objects stored in memory.
 
         >>> #Example
         """
         # return get_item dataset
-        pass
+        datasets = []
+        for image in images:
+            # create a dataset from a single file
+            datasets.append(InMemoryDataset(cfg, image))
+        return ConcatDataset(datasets)
 
     @staticmethod
     def from_tiff(cfg, filenames: List[str]):

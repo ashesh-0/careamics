@@ -19,7 +19,7 @@ from careamics_restoration.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class InMemory_Dataset(torch.utils.data.Dataset):
+class InMemoryDataset(torch.utils.data.Dataset):
     """Dataset to extract patches from a tiff image(s).
 
     Parameters
