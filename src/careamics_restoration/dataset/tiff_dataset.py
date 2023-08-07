@@ -1,18 +1,11 @@
-import logging
 from pathlib import Path
 from typing import Callable, Dict, Generator, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
-import tifffile
-from torch.utils.data import IterableDataset, get_worker_info
+from torch.utils.data import IterableDataset
 
 from careamics_restoration.config import Configuration
 from careamics_restoration.config.training import ExtractionStrategies
-from careamics_restoration.dataset.tiling import (
-    extract_patches_random,
-    extract_patches_sequential,
-    extract_tiles,
-)
 from careamics_restoration.manipulation import default_manipulate
 from careamics_restoration.utils import normalize
 from careamics_restoration.utils.logging import get_logger
@@ -30,8 +23,6 @@ class ShuffleIterableDataset(IterableDataset):
 
     def __iter__(self) -> Iterator:
         """Iterate over all samples."""
-        shuffle_buffer = []
-
         for dataset in self.datasets:
             assert isinstance(
                 dataset, IterableDataset
@@ -109,68 +100,6 @@ class TiffDataset(IterableDataset):
         self.patch_transform = patch_transform
         self.patch_transform_params = patch_transform_params
 
-    def list_files(self) -> List[Path]:
-        """Creates a list of paths to source tiff files from path string.
-
-        Returns
-        -------
-        List[Path]
-            List of pathlib.Path objects
-        """
-        files = sorted(Path(self.data_path).rglob(f"*.{self.data_format}*"))
-        return files
-
-    def read_image(self, file_path: Path) -> np.ndarray:
-        """Reads a file and returns a numpy array.
-
-        Parameters
-        ----------
-        file_path : Path
-            pathlib.Path object containing a path to a file
-
-        Returns
-        -------
-        np.ndarray
-            array containing the image
-
-        Raises
-        ------
-        ValueError, OSError
-            if a file is not a valid tiff or damaged
-        ValueError
-            if data dimensions are not 2, 3 or 4
-        ValueError
-            if axes parameter from config is not consistent with data dimensions
-        """
-        if file_path.suffix == ".npy":
-            try:
-                sample = np.load(file_path)
-            except ValueError:
-                sample = np.load(file_path, allow_pickle=True)
-
-        elif file_path.suffix[:4] == ".tif":
-            try:
-                sample = tifffile.imread(file_path)
-            except (ValueError, OSError) as e:
-                logging.exception(f"Exception in file {file_path}: {e}, skipping")
-                raise e
-
-        sample = sample.squeeze()
-
-        if len(sample.shape) < 2 or len(sample.shape) > 4:
-            raise ValueError(
-                f"Incorrect data dimensions. Must be 2, 3 or 4 (got {sample.shape} for"
-                f"file {file_path})."
-            )
-
-        # check number of axes
-        if len(self.axes) != len(sample.shape):
-            raise ValueError(
-                f"Incorrect axes length (got {self.axes} for file {file_path})."
-            )
-        sample = self.fix_axes(sample)
-        return sample
-
     def calculate_mean_and_std(self) -> Tuple[float, float]:
         """Calculates mean and std of the dataset.
 
@@ -194,8 +123,6 @@ class TiffDataset(IterableDataset):
         logger.info(f"Mean: {result_mean}, std: {result_std}")
         # TODO pass stage here to be more explicit with logging
         return result_mean, result_std
-
-    # TODO Jean-Paul: get rid of numpy for now
 
     def fix_axes(self, sample: np.ndarray) -> np.ndarray:
         """Fixes axes of the sample to match the config axes.
@@ -262,27 +189,6 @@ class TiffDataset(IterableDataset):
             raise ValueError("No patches generated")
 
         return patches
-
-    def iterate_files(self) -> Generator:
-        """
-        Iterate over data source and yield whole image.
-
-        Yields
-        ------
-        np.ndarray
-        """
-        # When num_workers > 0, each worker process will have a different copy of the
-        # dataset object
-        # Configuring each copy independently to avoid having duplicate data returned
-        # from the workers
-        worker_info = get_worker_info()
-        worker_id = worker_info.id if worker_info is not None else 0
-        num_workers = worker_info.num_workers if worker_info is not None else 1
-
-        for i, filename in enumerate(self.files):
-            if i % num_workers == worker_id:
-                sample = self.read_image(filename)
-                yield sample
 
     def __iter__(self) -> Generator[np.ndarray, None, None]:
         """
