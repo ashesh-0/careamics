@@ -1,4 +1,3 @@
-import copy
 from pathlib import Path
 
 import pytest
@@ -45,7 +44,13 @@ def test_config_invalid_working_directory(tmp_path: Path, minimum_config: dict):
 
     Since its parent does not exist, this case is invalid.
     """
-    path = tmp_path / "tmp/tmp"
+    path = tmp_path / "tmp" / "tmp"
+    minimum_config["working_directory"] = str(path)
+    with pytest.raises(ValueError):
+        Configuration(**minimum_config)
+
+    path = tmp_path / "tmp.txt"
+    path.touch()
     minimum_config["working_directory"] = str(path)
     with pytest.raises(ValueError):
         Configuration(**minimum_config)
@@ -83,32 +88,6 @@ def test_set_3D(minimum_config: dict):
         conf.set_3D(False, "ZYX")
 
 
-def test_at_least_one_of_training_or_prediction(complete_config: dict):
-    """Test that at least one of training or prediction is specified."""
-    test_config = copy.deepcopy(complete_config)
-
-    # remove training and prediction
-    test_config.pop("training")
-    test_config.pop("prediction")
-
-    # test that config is invalid
-    with pytest.raises(ValueError):
-        Configuration(**test_config)
-
-    # test that config is valid if we add training
-    test_config["training"] = copy.deepcopy(complete_config["training"])
-    config_train = Configuration(**test_config)
-    assert config_train.training.model_dump() == test_config["training"]
-
-    # remove training
-    test_config.pop("training")
-
-    # test that config is valid if we add prediction
-    test_config["prediction"] = copy.deepcopy(complete_config["prediction"])
-    config_pred = Configuration(**test_config)
-    assert config_pred.prediction.model_dump() == test_config["prediction"]
-
-
 def test_wrong_values_by_assignment(complete_config: dict):
     """Test that wrong values raise an error when assigned."""
     config = Configuration(**complete_config)
@@ -137,16 +116,6 @@ def test_wrong_values_by_assignment(complete_config: dict):
     config.training = complete_config["training"]
     with pytest.raises(ValueError):
         config.training = "Hubert Blaine Wolfeschlegelsteinhausenbergerdorff Sr."
-
-    # prediction
-    config.prediction = complete_config["prediction"]
-    with pytest.raises(ValueError):
-        config.prediction = "You can call me Giorgio"
-
-    # Test that the model validators are also run after assigment
-    config.prediction = None
-    with pytest.raises(ValueError):
-        config.training = None
 
     # TODO Because algorithm is a sub-model of Configuration, and the validation is
     # done at the level of the Configuration, this does not cause any error, although
@@ -177,7 +146,7 @@ def test_config_to_dict_with_default_optionals(complete_config: dict):
     complete_config["algorithm"]["masked_pixel_percentage"] = 0.2
     complete_config["algorithm"]["model_parameters"] = {
         "depth": 2,
-        "num_channels_init": 96,
+        "num_channels_init": 32,
     }
 
     # Training default optional parameters
@@ -208,3 +177,20 @@ def test_config_to_yaml(tmp_path: Path, minimum_config: dict):
     # load from yaml
     my_other_conf = load_configuration(yaml_path)
     assert my_other_conf == myconf
+
+
+def test_config_to_yaml_wrong_path(tmp_path: Path, minimum_config: dict):
+    """Test that an error is raised when the path is not a directory and not a .yml"""
+
+    # test that we can instantiate a config
+    myconf = Configuration(**minimum_config)
+
+    # export to yaml
+    yaml_path = tmp_path / "tmp.txt"
+    with pytest.raises(ValueError):
+        save_configuration(myconf, yaml_path)
+
+    # existing file
+    yaml_path.touch()
+    with pytest.raises(ValueError):
+        save_configuration(myconf, yaml_path)

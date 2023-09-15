@@ -3,6 +3,7 @@ from typing import Dict, Optional, Tuple, Union
 
 import torch
 
+from ..bioimage import import_bioimage_model
 from ..config import Configuration
 from ..config.algorithm import Models
 from ..utils.logging import get_logger
@@ -18,8 +19,6 @@ def model_registry(model_name: str) -> torch.nn.Module:
     -------
     model
     """
-    # TODO make this a dict, not a function
-    # TODO: add more models
     if model_name == Models.UNET:
         return UNet
     else:
@@ -28,8 +27,8 @@ def model_registry(model_name: str) -> torch.nn.Module:
 
 def create_model(
     *,
-    config: Optional[Configuration] = None,
     model_path: Optional[Union[str, Path]] = None,
+    config: Optional[Configuration] = None,
     device: Optional[torch.device] = None,
 ) -> torch.nn.Module:
     """Creates a model from a configuration file or a checkpoint.
@@ -39,14 +38,13 @@ def create_model(
 
     Parameters
     ----------
-    config : Optional[Configuration], optional
-        Configuration object, by default None
     model_path : Optional[Union[str, Path]], optional
         Path to a checkpoint, by default None
+    config : Optional[Configuration], optional
+        Configuration object, by default None
 
     Returns
     -------
-    # TODO wrong return type
     torch.nn.Module
         Model object
 
@@ -59,8 +57,14 @@ def create_model(
     if model_path is not None:
         # Create model from checkpoint
         model_path = Path(model_path)
-        if not model_path.exists() or not model_path.suffix == ".pth":
-            raise ValueError(f"Invalid model path: {model_path}")
+        if not model_path.exists() or model_path.suffix not in [".pth", ".zip"]:
+            raise ValueError(
+                f"Invalid model path: {model_path}. Current working dir: \
+                              {Path.cwd()!s}"
+            )
+
+        if model_path.suffix == ".zip":
+            model_path = import_bioimage_model(model_path)
 
         # Load checkpoint
         checkpoint = torch.load(model_path, map_location=device)
@@ -84,6 +88,7 @@ def create_model(
         # Load the model state dict
         if "model_state_dict" in checkpoint:
             model.load_state_dict(checkpoint["model_state_dict"])
+            logger.info("Loaded model state dict")
         else:
             raise ValueError("Invalid checkpoint format")
 
@@ -109,6 +114,7 @@ def create_model(
         assert config is not None, "Configuration must be provided"  # mypy
         optimizer, scheduler = get_optimizer_and_scheduler(config, model)
         scaler = get_grad_scaler(config)
+        logger.info("Engine initialized from configuration")
 
     else:
         raise ValueError("Either config or model_path must be provided")

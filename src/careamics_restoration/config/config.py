@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union
 
 import yaml
 from pydantic import (
@@ -15,13 +15,7 @@ from pydantic import (
 from .algorithm import Algorithm
 from .config_filter import paths_to_str
 from .data import Data
-from .prediction import Prediction
 from .training import Training
-
-# TODO: test if parameter parent_config at the top of the config could work
-# TODO: config version?
-# TODO: for the working directory to work it should probably be set globally when
-# starting the engine
 
 
 class Configuration(BaseModel):
@@ -36,9 +30,8 @@ class Configuration(BaseModel):
         directory does not exist itself, it is then created.
     - algorithm:
         algorithm configuration
-    - training or prediction:
-        training or prediction configuration, one of the two configuration must be
-        provided.
+    - training:
+        training configuration.
 
     Attributes
     ----------
@@ -48,10 +41,8 @@ class Configuration(BaseModel):
         Path to the working directory.
     algorithm : Algorithm
         Algorithm configuration.
-    training : Optional[Training]
+    training : Training
         Training configuration.
-    prediction : Optional[Prediction]
-        Prediction configuration.
     """
 
     model_config = ConfigDict(validate_assignment=True)
@@ -63,10 +54,7 @@ class Configuration(BaseModel):
     # Sub-configurations
     algorithm: Algorithm
     data: Data
-
-    # Optional sub-configurations
-    training: Optional[Training] = None
-    prediction: Optional[Prediction] = None
+    training: Training
 
     def set_3D(self, is_3D: bool, axes: str) -> None:
         """Set 3D flag and axes.
@@ -128,35 +116,6 @@ class Configuration(BaseModel):
         path.mkdir(exist_ok=True)
 
         return path
-
-    @model_validator(mode="after")
-    def at_least_training_or_prediction(cls, config: Configuration) -> Configuration:
-        """Checks training/prediction config validity.
-
-        Check that at least one of training or prediction is defined, and that
-        the corresponding data path is as well.
-
-        Parameters
-        ----------
-        config : Configuration
-            Configuration to validate.
-
-        Returns
-        -------
-        Configuration
-            Validated configuration.
-
-        Raises
-        ------
-        ValueError
-            If neither training nor prediction is defined, and if their corresponding
-            paths are not defined.
-        """
-        # check that at least one of training or prediction is defined
-        if config.training is None and config.prediction is None:
-            raise ValueError("At least one of training or prediction must be defined.")
-
-        return config
 
     @model_validator(mode="after")
     def validate_3D(cls, config: Configuration) -> Configuration:
@@ -221,17 +180,11 @@ class Configuration(BaseModel):
         dictionary["algorithm"] = self.algorithm.model_dump(
             exclude_optionals=exclude_optionals
         )
-        dictionary["data"] = self.data.model_dump(exclude_optionals=exclude_optionals)
+        dictionary["data"] = self.data.model_dump()
 
-        # same for optional fields
-        if self.training is not None:
-            dictionary["training"] = self.training.model_dump(
-                exclude_optionals=exclude_optionals
-            )
-        if self.prediction is not None:
-            dictionary["prediction"] = self.prediction.model_dump(
-                exclude_optionals=exclude_optionals
-            )
+        dictionary["training"] = self.training.model_dump(
+            exclude_optionals=exclude_optionals
+        )
 
         return dictionary
 
@@ -250,12 +203,16 @@ def load_configuration(path: Union[str, Path]) -> Configuration:
         Configuration.
     """
     # load dictionary from yaml
+    if not Path(path).exists():
+        raise FileNotFoundError(
+            f"Configuration file {path} does not exist in " f" {Path.cwd()!s}"
+        )
+
     dictionary = yaml.load(Path(path).open("r"), Loader=yaml.SafeLoader)
 
     return Configuration(**dictionary)
 
 
-# TODO add save optional to this function
 def save_configuration(config: Configuration, path: Union[str, Path]) -> Path:
     """Save configuration to path.
 
@@ -281,10 +238,16 @@ def save_configuration(config: Configuration, path: Union[str, Path]) -> Path:
     config_path = Path(path)
 
     # check if path is pointing to an existing directory or .yml file
-    if config_path.is_dir():
-        config_path = Path(config_path, "config.yml")
-    elif config_path.is_file() and config_path.suffix != ".yml":
-        raise ValueError(f"Path must be a directory or .yml file (got {config_path}).")
+    if config_path.exists():
+        if config_path.is_dir():
+            config_path = Path(config_path, "config.yml")
+        elif config_path.suffix != ".yml":
+            raise ValueError(
+                f"Path must be a directory or .yml file (got {config_path})."
+            )
+    else:
+        if config_path.suffix != ".yml":
+            raise ValueError(f"Path must be a .yml file (got {config_path}).")
 
     # save configuration as dictionary to yaml
     with open(config_path, "w") as f:
