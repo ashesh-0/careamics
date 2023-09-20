@@ -371,7 +371,7 @@ class Engine:
             raise ValueError("Configuration is not defined, cannot predict.")
 
         # Check that the mean and std are there (= has been trained)
-        if not (self.cfg.data.mean or not self.cfg.data.std) or not (mean or std):
+        if not self.cfg.data.mean or not self.cfg.data.std:
             raise ValueError(
                 "Mean or std are not specified in the configuration, prediction cannot "
                 "be performed."
@@ -605,6 +605,7 @@ class Engine:
 
             # Create dataset
             dataset = TensorDataset(torch.from_numpy(normalized_input))
+
         elif isinstance(input, str) or isinstance(input, Path):  # path
             # Create dataset
             dataset = get_prediction_dataset(

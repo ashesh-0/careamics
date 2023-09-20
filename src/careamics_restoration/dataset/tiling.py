@@ -299,7 +299,7 @@ def extract_patches_random(
     patches_sanity_check(arr, patch_size, is_3d_patch)
 
     rng = np.random.default_rng()
-    # shuffle the array along the first axis TODO do we need shuffling?
+    # shuffle the array along the first axis
     rng.shuffle(arr, axis=0)
 
     for sample_idx in range(arr.shape[0]):

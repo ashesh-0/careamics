@@ -124,34 +124,6 @@ class TiffDataset(IterableDataset):
         # TODO pass stage here to be more explicit with logging
         return result_mean, result_std
 
-    def fix_axes(self, sample: np.ndarray) -> np.ndarray:
-        """Fixes axes of the sample to match the config axes.
-
-        Parameters
-        ----------
-        sample : np.ndarray
-            array containing the image
-
-        Returns
-        -------
-        np.ndarray
-            reshaped array
-        """
-        # concatenate ST axes to N, return NCZYX
-        if ("S" in self.axes or "T" in self.axes) and sample.dtype != "O":
-            new_axes_len = len(self.axes.replace("Z", "").replace("YX", ""))
-            # TODO test reshape, replace with moveaxis ?
-            sample = sample.reshape(-1, *sample.shape[new_axes_len:]).astype(np.float32)
-
-        elif sample.dtype == "O":
-            for i in range(len(sample)):
-                sample[i] = np.expand_dims(sample[i], axis=0).astype(np.float32)
-
-        else:
-            sample = np.expand_dims(sample, axis=0).astype(np.float32)
-
-        return sample
-
     def generate_patches(self, sample: np.ndarray) -> Generator[np.ndarray, None, None]:
         """Generate patches from a sample.
 
