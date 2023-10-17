@@ -1,4 +1,6 @@
 """Provide utilities for exporting models to BioImage model zoo."""
+import os
+os.environ.setdefault("BIOIMAGEIO_CACHE_WARNINGS_LIMIT", "0")
 
 from .io import (
     PYTORCH_STATE_DICT,
