@@ -5,12 +5,12 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
-from bioimageio.spec.model.raw_nodes import Model as BioimageModel
 from torch.utils.data import DataLoader, TensorDataset
 
 from careamics_restoration.bioimage import (
     build_zip_model,
     get_default_model_specs,
+    BioimageModel,
 )
 from careamics_restoration.utils.logging import ProgressBar, get_logger
 
