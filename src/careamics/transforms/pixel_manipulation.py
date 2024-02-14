@@ -254,6 +254,7 @@ def uniform_manipulate(
 def _get_indices_matrix(
     image_shape: Tuple[int, ...], coords: np.ndarray, patch_size: Tuple[int, ...]
 ) -> np.ndarray:
+    # TODO add C dimension!
     # select spatial shape
     image_shape = image_shape[-len(patch_size) :]
 
@@ -267,13 +268,14 @@ def _get_indices_matrix(
     offsets = [coord_matrices[i] - patch_size[i] // 2 for i in range(len(patch_size))]
 
     # for each coordinate in the input image, create a patch around it
-    # TODO can this be done without loop
+    # TODO can this be done without loop?
     crop_indices = []
     for c in coords:
         # calculate the index of each pixel in the patch around the coordinate
         crop_index = [c[i] + offsets[i] for i in range(len(patch_size))]
 
         # clip arrays
+        # TODO use masked array instead of boundary reflection?
         clipped_index = [
             np.clip(crop_index[i], 0, image_shape[i] - 1)
             for i in range(len(patch_size))
@@ -318,14 +320,16 @@ def median_manipulate(
     indices = _get_indices_matrix(patch.shape, coords, roi_size)
 
     # extract the crops
-    # shape: (b, C, N_coords, *patch_size)
+    # shape: (C, N_coords, *patch_size)
     if len(patch.shape) == 2:
         crops = patch[..., indices[0], indices[1]]
     else:
         crops = patch[..., indices[0], indices[1], indices[2]]
 
+    # TODO mask array for centers of the patches and struct mask
+
     # compute median along the first axis
     np.median(crops, axis=-len(roi_size) - 1)
 
-    # replace the original pixels with the replacement pixels
+    # replace the original pixels with the median pixels
     # TODO
