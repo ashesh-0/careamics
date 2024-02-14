@@ -252,31 +252,26 @@ def uniform_manipulate(
 
 
 def _get_indices_matrix(
-        image_shape: Tuple[int, ...],
-        coords: np.ndarray,
-        patch_size: Tuple[int, ...]
-    ) -> np.ndarray:
+    image_shape: Tuple[int, ...], coords: np.ndarray, patch_size: Tuple[int, ...]
+) -> np.ndarray:
     # select spatial shape
-    image_shape = image_shape[-len(patch_size):]
+    image_shape = image_shape[-len(patch_size) :]
 
     # create the individual patch indices for each dimension
     coord_vectors = [np.arange(patch_size[i]) for i in range(len(patch_size))]
 
     # and a mehgrid out of the patch indices
-    coord_matrices = np.meshgrid(*coord_vectors, indexing='ij')
+    coord_matrices = np.meshgrid(*coord_vectors, indexing="ij")
 
     # generate relative offset to the center of a patch for each pixel in the patch
     offsets = [coord_matrices[i] - patch_size[i] // 2 for i in range(len(patch_size))]
 
     # for each coordinate in the input image, create a patch around it
+    # TODO can this be done without loop
     crop_indices = []
     for c in coords:
-
         # calculate the index of each pixel in the patch around the coordinate
-        crop_index = [
-            c[i] + offsets[i]
-            for i in range(len(patch_size))
-        ]
+        crop_index = [c[i] + offsets[i] for i in range(len(patch_size))]
 
         # clip arrays
         clipped_index = [
@@ -285,21 +280,25 @@ def _get_indices_matrix(
         ]
 
         # create a numpy array with an extra dimension for later concatenation
-        crop_array = np.array(np.array(clipped_index)[np.newaxis, ...])
+        crop_array = np.array(clipped_index)[np.newaxis, ...]
 
         # append the patch indices to the list
         crop_indices.append(crop_array)
 
     # concatenate all patch indices along the new extra dimension
-    # this should now be of shape (N_coords, len(path_size), *patch_size)
+    # this should now be of shape (N_coords, len(patch_size), *patch_size)
     array_crop_indices = np.concatenate(crop_indices)
     assert array_crop_indices.shape == (len(coords), len(patch_size), *patch_size)
 
     # return tuple that can be used for advanced numpy array indexing
     if len(patch_size) == 2:
-        return array_crop_indices[:,0,:], array_crop_indices[:,1,:]
+        return array_crop_indices[:, 0, :], array_crop_indices[:, 1, :]
     else:
-        return array_crop_indices[:,0,:], array_crop_indices[:,1,:], array_crop_indices[:,2,:]
+        return (
+            array_crop_indices[:, 0, :],
+            array_crop_indices[:, 1, :],
+            array_crop_indices[:, 2, :],
+        )
 
 
 # TODO: is there batch dim?
@@ -309,13 +308,12 @@ def median_manipulate(
     roi_size: Tuple[int, ...],
     struct_mask: Optional[np.ndarray] = None,
 ) -> Tuple[np.ndarray, ...]:
-    
-    original_patch = patch.copy()
+    patch.copy()
 
     # TODO: struct mask could be generated from roi center & removed from grid as well
     # Get the coordinates of the pixels to be replaced
     coords = _get_stratified_coords(mask_pixel_percentage, patch.shape)
-    
+
     # get indices
     indices = _get_indices_matrix(patch.shape, coords, roi_size)
 
@@ -327,7 +325,7 @@ def median_manipulate(
         crops = patch[..., indices[0], indices[1], indices[2]]
 
     # compute median along the first axis
-    medians = np.median(crops, axis=-len(roi_size)-1)
+    np.median(crops, axis=-len(roi_size) - 1)
 
     # replace the original pixels with the replacement pixels
     # TODO
