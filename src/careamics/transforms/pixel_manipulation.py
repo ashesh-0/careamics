@@ -135,7 +135,7 @@ def _get_stratified_coords(
     return coordinate_grid
 
 
-# TODO channels: masking the same pixel across channels?
+# TODO roi size? how about 3D?
 def uniform_manipulate(
     patch: np.ndarray,
     mask_pixel_percentage: float,
@@ -188,6 +188,7 @@ def uniform_manipulate(
         0,
         [patch.shape[i] - 1 for i in range(len(patch.shape))],
     )
+
     # Get the replacement pixels from all rois
     replacement_pixels = patch[tuple(replacement_coords.T.tolist())]
 
@@ -215,36 +216,118 @@ def uniform_manipulate(
 # TODO: create tests
 # TODO: find an optimized way in np without for loop
 # TODO: add struct mask
+# def median_manipulate(
+#     patch: np.ndarray,
+#     mask_pixel_percentage: float,
+#     roi_size: int = 11,
+#     struct_mask: Optional[np.ndarray] = None,
+# ) -> Tuple[np.ndarray, ...]:
+#     """Works on the assumption that it is 2D or 3D image."""
+#     # TODO this assumes patch has no channel dimension. Is this correct?
+#     patch = patch.squeeze()
+#     mask = np.zeros_like(patch)
+#     original_patch = patch.copy()
+
+#     # Get the coordinates of the pixels to be replaced
+#     roi_centers = _get_stratified_coords(mask_pixel_percentage, patch.shape)
+
+#     for center in roi_centers:
+#         min_coord = [max(0, c - roi_size // 2) for c in center]
+#         max_coord = [min(s, c + roi_size // 2 + 1) for s, c in zip(patch.shape, center)]
+
+#         coords = [slice(min_coord[i], max_coord[i]) for i in range(patch.ndim)]
+
+#         # extract roi around center
+#         roi = patch[tuple(coords)]
+
+#         # replace center pixel by median
+#         patch[tuple(center)] = np.median(roi)
+#         mask[tuple(center)] = 1
+
+#     return (
+#         np.expand_dims(patch, 0),
+#         np.expand_dims(original_patch, 0),
+#         np.expand_dims(mask, 0),
+#     )
+
+
+def _get_indices_matrix(
+        image_shape: Tuple[int, ...],
+        coords: np.ndarray,
+        patch_size: Tuple[int, ...]
+    ) -> np.ndarray:
+    # select spatial shape
+    image_shape = image_shape[-len(patch_size):]
+
+    # create the individual patch indices for each dimension
+    coord_vectors = [np.arange(patch_size[i]) for i in range(len(patch_size))]
+
+    # and a mehgrid out of the patch indices
+    coord_matrices = np.meshgrid(*coord_vectors, indexing='ij')
+
+    # generate relative offset to the center of a patch for each pixel in the patch
+    offsets = [coord_matrices[i] - patch_size[i] // 2 for i in range(len(patch_size))]
+
+    # for each coordinate in the input image, create a patch around it
+    crop_indices = []
+    for c in coords:
+
+        # calculate the index of each pixel in the patch around the coordinate
+        crop_index = [
+            c[i] + offsets[i]
+            for i in range(len(patch_size))
+        ]
+
+        # clip arrays
+        clipped_index = [
+            np.clip(crop_index[i], 0, image_shape[i] - 1)
+            for i in range(len(patch_size))
+        ]
+
+        # create a numpy array with an extra dimension for later concatenation
+        crop_array = np.array(np.array(clipped_index)[np.newaxis, ...])
+
+        # append the patch indices to the list
+        crop_indices.append(crop_array)
+
+    # concatenate all patch indices along the new extra dimension
+    # this should now be of shape (N_coords, len(path_size), *patch_size)
+    array_crop_indices = np.concatenate(crop_indices)
+    assert array_crop_indices.shape == (len(coords), len(patch_size), *patch_size)
+
+    # return tuple that can be used for advanced numpy array indexing
+    if len(patch_size) == 2:
+        return array_crop_indices[:,0,:], array_crop_indices[:,1,:]
+    else:
+        return array_crop_indices[:,0,:], array_crop_indices[:,1,:], array_crop_indices[:,2,:]
+
+
+# TODO: is there batch dim?
 def median_manipulate(
     patch: np.ndarray,
     mask_pixel_percentage: float,
-    roi_size: int = 11,
+    roi_size: Tuple[int, ...],
     struct_mask: Optional[np.ndarray] = None,
 ) -> Tuple[np.ndarray, ...]:
-    """Works on the assumption that it is 2D or 3D image."""
-    # TODO this assumes patch has no channel dimension. Is this correct?
-    patch = patch.squeeze()
-    mask = np.zeros_like(patch)
+    
     original_patch = patch.copy()
 
+    # TODO: struct mask could be generated from roi center & removed from grid as well
     # Get the coordinates of the pixels to be replaced
-    roi_centers = _get_stratified_coords(mask_pixel_percentage, patch.shape)
+    coords = _get_stratified_coords(mask_pixel_percentage, patch.shape)
+    
+    # get indices
+    indices = _get_indices_matrix(patch.shape, coords, roi_size)
 
-    for center in roi_centers:
-        min_coord = [max(0, c - roi_size // 2) for c in center]
-        max_coord = [min(s, c + roi_size // 2 + 1) for s, c in zip(patch.shape, center)]
+    # extract the crops
+    # shape: (b, C, N_coords, *patch_size)
+    if len(patch.shape) == 2:
+        crops = patch[..., indices[0], indices[1]]
+    else:
+        crops = patch[..., indices[0], indices[1], indices[2]]
 
-        coords = [slice(min_coord[i], max_coord[i]) for i in range(patch.ndim)]
+    # compute median along the first axis
+    medians = np.median(crops, axis=-len(roi_size)-1)
 
-        # extract roi around center
-        roi = patch[tuple(coords)]
-
-        # replace center pixel by median
-        patch[tuple(center)] = np.median(roi)
-        mask[tuple(center)] = 1
-
-    return (
-        np.expand_dims(patch, 0),
-        np.expand_dims(original_patch, 0),
-        np.expand_dims(mask, 0),
-    )
+    # replace the original pixels with the replacement pixels
+    # TODO

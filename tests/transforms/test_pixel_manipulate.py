@@ -5,7 +5,8 @@ from careamics.transforms.pixel_manipulation import (
     uniform_manipulate,
     _get_stratified_coords,
     _apply_struct_mask,
-    median_manipulate
+    median_manipulate,
+    _get_indices_matrix
 )
 
 
@@ -108,3 +109,116 @@ def test_median_manipulate_ordered(ordered_array, shape):
     # check that the arrays are different
     assert not np.array_equal(patch, original_patch)
 
+
+
+
+def test_get_indices_matrix_2d():
+    
+    image = np.arange(15*15).reshape((15, 15))
+    
+    patch_size = (3, 5)
+    coords = np.array(
+        [
+            [2, 6],
+            [14, 5],
+            [0, 13]
+        ]
+    )
+
+    expected_result = np.array(
+        [
+            # first patch
+            [
+                [19, 20, 21, 22, 23],
+                [34, 35, 36, 37, 38],
+                [49, 50, 51, 52, 53]
+            ],
+            # second patch
+            [
+                [198, 199, 200, 201, 202],
+                [213, 214, 215, 216, 217],
+                [213, 214, 215, 216, 217]
+            ],
+            # third patch
+            [
+                [11, 12, 13, 14, 14],
+                [11, 12, 13, 14, 14],
+                [26, 27, 28, 29, 29]
+            ]
+        ]
+    )
+
+    result = _get_indices_matrix(image.shape, coords, patch_size)
+
+    res = image[result[0], result[1]]
+    assert (res == expected_result).all()
+
+
+def test_get_indices_matrix_3d():
+    image = np.arange(10*10*5).reshape((10, 10, 5))
+    
+    patch_size = (3, 5, 3)
+    coords = np.array(
+        [
+            [2, 6, 2],
+            [7, 3, 0]
+        ]
+    )
+
+    expected_result = np.array(
+        [
+            # first patch
+            [
+                [
+                    [ 71,  72,  73],
+                    [ 76,  77,  78],
+                    [ 81,  82,  83],
+                    [ 86,  87,  88],
+                    [ 91,  92,  93]
+                ],
+                [
+                    [121, 122, 123],
+                    [126, 127, 128],
+                    [131, 132, 133],
+                    [136, 137, 138],
+                    [141, 142, 143]
+                ],
+                [
+                    [171, 172, 173],
+                    [176, 177, 178],
+                    [181, 182, 183],
+                    [186, 187, 188],
+                    [191, 192, 193]
+                ]
+            ],
+            # second patch
+            [
+                [
+                    [305, 305, 306],
+                    [310, 310, 311],
+                    [315, 315, 316],
+                    [320, 320, 321],
+                    [325, 325, 326]
+                ],
+                [
+                    [355, 355, 356],
+                    [360, 360, 361],
+                    [365, 365, 366],
+                    [370, 370, 371],
+                    [375, 375, 376]
+                ],
+                [
+                    [405, 405, 406],
+                    [410, 410, 411],
+                    [415, 415, 416],
+                    [420, 420, 421],
+                    [425, 425, 426]
+                ]
+            ]
+        ]
+    )
+
+    result = _get_indices_matrix(image.shape, coords, patch_size)
+
+    res = image[result[0], result[1], result[2]]
+    assert (res == expected_result).all()
