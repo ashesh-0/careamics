@@ -1,0 +1,90 @@
+"""
+A script to train and evaluate a 2D N2V model.
+"""
+import argparse
+import os
+from pathlib import Path
+
+import torch
+import albumentations as Aug
+import socket
+import matplotlib.pyplot as plt
+import tifffile
+from careamics_portfolio import PortfolioManager
+from pytorch_lightning import Trainer
+import wandb
+import git
+
+from careamics import CAREamicsModule
+from careamics.lightning_prediction import CAREamicsFiring
+from careamics.ligthning_datamodule import (
+    CAREamicsPredictDataModule,
+    CAREamicsTrainDataModule,
+)
+from careamics.transforms import N2VManipulate
+from careamics.utils.metrics import psnr
+from careamics.utils.experiment_saving import dump_config, add_git_info, get_workdir
+
+def get_model():
+    model = CAREamicsModule(
+    algorithm="n2v",
+    loss="n2v",
+    architecture="UNet",
+    model_parameters={"n2v2": True},
+    optimizer_parameters={"lr": 1e-3},
+    lr_scheduler_parameters={"factor": 0.5, "patience": 10},
+    )
+    return model
+
+def train(datapath, traindir, just_eval=False,modelpath=None):
+    assert os.path.exists(datapath) #and os.path.isdir(datapath), f"Path {datapath} does not exist or is not a directory"
+    # setting up the experiment.
+    config = {'datapath':datapath, 'modelpath':modelpath, 'just_eval':just_eval}
+    add_git_info(config)
+    exp_directory = get_workdir(traindir, False)
+    dump_config(config, exp_directory)
+    hostname = socket.gethostname()
+    wandb.init(name=os.path.join(hostname, *exp_directory.split('/')[-2:]), dir=traindir, project="N2V", config=config)
+
+    # loading/training the model and predicting
+    model = get_model()
+    if just_eval:
+        assert modelpath is not None and os.path.exists(modelpath)
+        model = model.load_from_checkpoint(modelpath)
+    else: 
+        train_data_module = CAREamicsTrainDataModule(
+        train_path=datapath,
+        val_path=datapath,
+        data_type="tiff",
+        patch_size=(64, 64),
+        axes="SYX",
+        batch_size=128,
+        dataloader_params={"num_workers": 4},
+        )
+        trainer = Trainer(max_epochs=1, default_root_dir="bsd_test")
+        trainer.fit(model, datamodule=train_data_module)
+
+    pred_data_module = CAREamicsPredictDataModule(
+    pred_path=datapath,
+    data_type="tiff",
+    tile_size=(256, 256),
+    axes="YX",
+    batch_size=1,
+    tta_transforms=True,
+    )
+    tiled_loop = CAREamicsFiring(trainer)
+    trainer.predict_loop = tiled_loop
+    preds = trainer.predict(model, datamodule=pred_data_module)
+    # save preds
+    
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('datapath', type=str)
+    parser.add_argument('--modelpath', type=str, default=None)
+    parser.add_argument('--just_eval', action='store_true')
+    parser.add_argument('--traindir', type=str, default=os.path.expanduser('~/training/N2V/'))
+    parser.add_argument('--add_gaussian_noise_std', type=float, default=0.0)
+    parser.add_argument('--poisson_noise_factor', type=float, default=-1)
+    args = parser.parse_args()
+    train(args.datapath, args.traindir, just_eval=args.just_eval, modelpath=args.modelpath)
+
