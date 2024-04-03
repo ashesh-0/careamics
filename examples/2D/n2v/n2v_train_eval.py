@@ -60,7 +60,7 @@ def get_model():
     )
     return model
 
-def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_factor=-1, gaussian_noise_std=0.0):
+def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_factor=-1, gaussian_noise_std=0.0, max_epochs=100):
     assert os.path.exists(datapath) #and os.path.isdir(datapath), f"Path {datapath} does not exist or is not a directory"
     # setting up the experiment.
     config = {'datapath':datapath, 'modelpath':modelpath, 'just_eval':just_eval}
@@ -93,7 +93,7 @@ def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_fact
         batch_size=128,
         dataloader_params={"num_workers": 4},
         )
-        trainer = Trainer(max_epochs=1, default_root_dir="bsd_test")
+        trainer = Trainer(max_epochs=max_epochs, default_root_dir="bsd_test")
         trainer.fit(model, datamodule=train_data_module)
 
     if just_eval != True:
@@ -128,7 +128,9 @@ if __name__ == '__main__':
     parser.add_argument('--traindir', type=str, default=os.path.expanduser('~/training/N2V/'))
     parser.add_argument('--gaussian_noise_std', type=float, default=0.0)
     parser.add_argument('--poisson_noise_factor', type=float, default=-1)
+    parser.add_argument('--max_epochs', type=int, default=100)
     args = parser.parse_args()
     train(args.datapath, args.traindir, just_eval=args.just_eval, modelpath=args.modelpath, 
-          poisson_noise_factor=args.poisson_noise_factor, gaussian_noise_std=args.gaussian_noise_std)
+          poisson_noise_factor=args.poisson_noise_factor, gaussian_noise_std=args.gaussian_noise_std,
+          max_epochs=args.max_epochs)
 
