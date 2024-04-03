@@ -32,8 +32,7 @@ def custom_mrc_reader(fpath, axes):
     _, data = read_mrc(fpath)
     data = data[None]
     data = np.swapaxes(data, 0, 3)
-    # return data[..., 0]
-    return data[:3,...,0].copy()
+    return data[...,0].copy()
 
 def get_model():
     model = CAREamicsModule(
