@@ -109,6 +109,7 @@ def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_fact
     axes="SYX",
     batch_size=1,
     tta_transforms=True,
+    dataloader_params={"num_workers": 4},
     )
     tiled_loop = CAREamicsFiring(trainer)
     trainer.predict_loop = tiled_loop
