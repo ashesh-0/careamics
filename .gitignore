@@ -6,3 +6,5 @@
 .coverage
 coverage.xml
 lightning_logs
+*.tif
+examples/2D/n2v/data/
