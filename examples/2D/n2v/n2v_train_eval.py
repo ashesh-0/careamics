@@ -15,6 +15,7 @@ from pytorch_lightning import Trainer
 import wandb
 import git
 from skimage.io import imsave as imsave_skimage
+from skimage.io import imread
 
 from careamics import CAREamicsModule
 from careamics.lightning_prediction import CAREamicsFiring
@@ -42,11 +43,39 @@ def noise_gen_decorator(data_func, poisson_noise_factor=-1, gaussian_noise_std=0
         return noisy_data
     return wrapper
 
+
+
+def load_tiff(path, axes):
+    """
+    Returns a 4d numpy array: num_imgs*h*w*num_channels
+    """
+    data = imread(path, plugin='tifffile')
+    return data
+
 def custom_mrc_reader(fpath, axes):
     _, data = read_mrc(fpath)
     data = data[None]
     data = np.swapaxes(data, 0, 3)
     return data[...,0].copy()
+
+def select_channels(data_load_fn, channel_idx, channel_dim):
+    """
+    Args:
+        data_load_fn: A function that loads the data.
+        channel_idx: The index of the channel to select.
+        channel_dim: The dimension of the channel.
+    """
+    def wrapper(*args, **kwargs):
+        data = data_load_fn(*args, **kwargs)
+        if channel_dim == 0:
+            return data[channel_idx].copy()
+        elif channel_dim == 1:
+            return data[:, channel_idx].copy()
+        elif channel_dim == 2:
+            return data[:, :, channel_idx].copy()
+        elif channel_dim == 3:
+            return data[:, :, :, channel_idx].copy()
+    return wrapper
 
 
 def get_model():
@@ -60,7 +89,8 @@ def get_model():
     )
     return model
 
-def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_factor=-1, gaussian_noise_std=0.0, max_epochs=100):
+def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_factor=-1, gaussian_noise_std=0.0, max_epochs=100,
+          channel_idx=None, channel_dim=None):
     assert os.path.exists(datapath) #and os.path.isdir(datapath), f"Path {datapath} does not exist or is not a directory"
     # setting up the experiment.
     config = {'datapath':datapath, 'modelpath':modelpath, 'just_eval':just_eval}
@@ -71,12 +101,30 @@ def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_fact
     dump_config(config, exp_directory)
     hostname = socket.gethostname()
     wandb.init(name=os.path.join(hostname, *exp_directory.split('/')[-2:]), dir=traindir, project="N2V", config=config)
+    if channel_idx is None:
+        data_type = "custom" if datapath.endswith(".mrc") else "tiff"
+    else:
+        data_type = "custom"
+        assert channel_dim is not None and isinstance(channel_dim, int)
 
-    data_type = "custom" if datapath.endswith(".mrc") else "tiff"
+
     mrc_read_fn = noise_gen_decorator(custom_mrc_reader, poisson_noise_factor=poisson_noise_factor, 
-                                      gaussian_noise_std=gaussian_noise_std)
+                                        gaussian_noise_std=gaussian_noise_std)
+    tiff_read_fn = noise_gen_decorator(load_tiff, poisson_noise_factor=poisson_noise_factor,
+                                        gaussian_noise_std=gaussian_noise_std)
     
-    read_source_func = mrc_read_fn if data_type == "custom" else None
+    if datapath.endswith(".mrc"):
+        read_source_func = mrc_read_fn
+    elif datapath.endswith(".tif"):
+        read_source_func = tiff_read_fn
+    
+    if channel_idx is not None:
+        read_source_func = select_channels(read_source_func, channel_idx, channel_dim)
+        assert data_type == "custom"
+    
+    if data_type != "custom":
+        read_source_func = None
+    
     # loading/training the model and predicting
     model = get_model()
     if just_eval:
@@ -129,8 +177,10 @@ if __name__ == '__main__':
     parser.add_argument('--gaussian_noise_std', type=float, default=0.0)
     parser.add_argument('--poisson_noise_factor', type=float, default=-1)
     parser.add_argument('--max_epochs', type=int, default=100)
+    parser.add_argument('--channel_idx', type=int, default=None)
+    parser.add_argument('--channel_dim', type=int, default=None)
     args = parser.parse_args()
     train(args.datapath, args.traindir, just_eval=args.just_eval, modelpath=args.modelpath, 
           poisson_noise_factor=args.poisson_noise_factor, gaussian_noise_std=args.gaussian_noise_std,
-          max_epochs=args.max_epochs)
+          max_epochs=args.max_epochs, channel_idx=args.channel_idx, channel_dim=args.channel_dim)
 
