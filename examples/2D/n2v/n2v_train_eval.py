@@ -116,9 +116,15 @@ def get_data_type(datapath, channel_idx,channel_dim, extension):
         return "tiff"
 
 def get_output_path(outputdir, datapath):
-    fname = os.path.basename(datapath)
-    # replace any extension with tif
-    fname = '.'.join(fname.split('.')[:-1])
+    if os.path.isdir(datapath):
+        fname = os.path.basename(datapath)
+    else:
+        assert os.path.exists(datapath)  
+        fname = os.path.basename(datapath)
+        # replace any extension with tif
+        fname = '.'.join(fname.split('.')[:-1])
+
+    assert fname != '', f"Could not extract filename from {datapath}"
     fname += '.tif'
     return os.path.join(outputdir, fname)
 
