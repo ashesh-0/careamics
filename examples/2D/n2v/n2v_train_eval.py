@@ -173,7 +173,7 @@ def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_fact
     else: 
         train_data_module = CAREamicsTrainDataModule(
         train_path=datapath,
-        val_path=datapath,
+        val_path=None,
         data_type=data_type,
         read_source_func=read_source_func,
         patch_size=(64, 64),
