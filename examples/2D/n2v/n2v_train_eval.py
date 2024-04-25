@@ -4,6 +4,7 @@ A script to train and evaluate a 2D N2V model.
 import argparse
 import os
 from pathlib import Path
+import json
 
 import torch
 import albumentations as Aug
@@ -117,6 +118,7 @@ def get_data_type(datapath, channel_idx,channel_dim, extension):
 
 def get_output_path(outputdir, datapath):
     if os.path.isdir(datapath):
+        datapath = datapath.strip('/')
         fname = os.path.basename(datapath)
     else:
         assert os.path.exists(datapath)  
@@ -175,6 +177,14 @@ def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_fact
     if just_eval:
         assert modelpath is not None and os.path.exists(modelpath)
         model = torch.load(modelpath)
+        config_fpath = os.path.join(os.path.dirname(modelpath), 'config.json')
+        with open(config_fpath, 'r') as f:
+            config = json.load(f)
+            assert config['channel_idx'] == channel_idx, f"Expected {channel_idx} got {config['channel_idx']}"
+            assert config['channel_dim'] == channel_dim, f"Expected {channel_dim} got {config['channel_dim']}"
+            assert config['poisson_noise_factor'] == poisson_noise_factor, f"Expected {poisson_noise_factor} got {config['poisson_noise_factor']}"
+            assert config['gaussian_noise_std'] == gaussian_noise_std, f"Expected {gaussian_noise_std} got {config['gaussian_noise_std']}"
+            assert config['datapath'].strip('/') == datapath.strip('/'), f"Expected {datapath} got {config['datapath']}"
         trainer = Trainer()
     else: 
         train_data_module = CAREamicsTrainDataModule(
