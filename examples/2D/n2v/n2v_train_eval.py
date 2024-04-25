@@ -145,7 +145,8 @@ def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_fact
           channel_idx=None, channel_dim=None):
     assert os.path.exists(datapath) #and os.path.isdir(datapath), f"Path {datapath} does not exist or is not a directory"
     # setting up the experiment.
-    config = {'datapath':datapath, 'modelpath':modelpath, 'just_eval':just_eval}
+    config = {'datapath':datapath, 'modelpath':modelpath, 'just_eval':just_eval, 'poisson_noise_factor':poisson_noise_factor,
+              'gaussian_noise_std':gaussian_noise_std, 'max_epochs':max_epochs, 'channel_idx':channel_idx, 'channel_dim':channel_dim}
     add_git_info(config)
     exp_directory = get_workdir(traindir, False)
     print(f"Experiment directory: {exp_directory}")
