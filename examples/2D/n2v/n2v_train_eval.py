@@ -30,6 +30,7 @@ from read_mrc import read_mrc
 import numpy as np
 from read_czi import load_data as load_czi_data
 from careamics.dataset.dataset_utils import list_files
+from read_nd2 import load_one_file as load_nd2_data
 
 
 def noise_gen_decorator(data_func, poisson_noise_factor=-1, gaussian_noise_std=0.0):
@@ -131,6 +132,9 @@ def get_read_source_func(extension,channel_idx, channel_dim, poisson_noise_facto
     elif extension == 'czi':
         read_source_func = noise_gen_decorator(load_czi_data, poisson_noise_factor=poisson_noise_factor,
                                         gaussian_noise_std=gaussian_noise_std)
+    elif extension == 'nd2':
+        read_source_func = noise_gen_decorator(load_nd2_data, poisson_noise_factor=poisson_noise_factor,
+                                        gaussian_noise_std=gaussian_noise_std)
     
     if channel_idx is not None:
         read_source_func = select_channels(read_source_func, channel_idx, channel_dim)
@@ -164,7 +168,8 @@ def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_fact
     model = get_model()
     if just_eval:
         assert modelpath is not None and os.path.exists(modelpath)
-        model = model.load_from_checkpoint(modelpath)
+        model = torch.load(modelpath)
+        trainer = Trainer()
     else: 
         train_data_module = CAREamicsTrainDataModule(
         train_path=datapath,
