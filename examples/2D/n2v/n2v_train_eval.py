@@ -184,7 +184,9 @@ def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_fact
             assert config['channel_dim'] == channel_dim, f"Expected {channel_dim} got {config['channel_dim']}"
             assert config['poisson_noise_factor'] == poisson_noise_factor, f"Expected {poisson_noise_factor} got {config['poisson_noise_factor']}"
             assert config['gaussian_noise_std'] == gaussian_noise_std, f"Expected {gaussian_noise_std} got {config['gaussian_noise_std']}"
-            assert config['datapath'].strip('/') == datapath.strip('/'), f"Expected {datapath} got {config['datapath']}"
+            if os.path.isdir(datapath):
+                assert config['datapath'].strip('/') == datapath.strip('/'), f"Expected {datapath} got {config['datapath']}"
+                # assert config['datapath'] == datapath, f"Expected {datapath} got {config['datapath']}"
         trainer = Trainer()
     else: 
         train_data_module = CAREamicsTrainDataModule(
