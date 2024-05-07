@@ -234,7 +234,7 @@ if __name__ == '__main__':
     parser.add_argument('--traindir', type=str, default=os.path.expanduser('~/training/N2V/'))
     parser.add_argument('--gaussian_noise_std', type=float, default=0.0)
     parser.add_argument('--poisson_noise_factor', type=float, default=-1)
-    parser.add_argument('--max_epochs', type=int, default=100)
+    parser.add_argument('--max_epochs', type=int, default=400)
     parser.add_argument('--channel_idx', type=int, default=None)
     parser.add_argument('--channel_dim', type=int, default=None)
     args = parser.parse_args()
