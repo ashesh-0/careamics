@@ -83,6 +83,7 @@ def select_channels(data_load_fn, channel_idx, channel_dim):
     """
     def wrapper(*args, **kwargs):
         data = data_load_fn(*args, **kwargs)
+        print('Selecting channel:', channel_idx, 'from dim:', channel_dim)
         if channel_dim == 0:
             return data[channel_idx].copy()
         elif channel_dim == 1:
