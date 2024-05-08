@@ -209,14 +209,14 @@ def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_fact
     
     outputdir = exp_directory
     pred_data_module = CAREamicsPredictDataModule(
-    pred_path=datapath,
-    data_type=data_type,
-    read_source_func=read_source_func,
-    tile_size=(256, 256),
-    axes="SYX",
-    batch_size=1,
-    tta_transforms=True,
-    dataloader_params={"num_workers": 4},
+        pred_path=datapath,
+        data_type=data_type,
+        read_source_func=read_source_func,
+        tile_size=(256, 256),
+        axes=axes,
+        batch_size=1,
+        tta_transforms=True,
+        dataloader_params={"num_workers": 4},
     )
     tiled_loop = CAREamicsFiring(trainer)
     trainer.predict_loop = tiled_loop
