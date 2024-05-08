@@ -155,8 +155,8 @@ def get_read_source_func(extension,channel_idx, channel_dim, poisson_noise_facto
     return read_source_func
 
 def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_factor=-1, gaussian_noise_std=0.0, max_epochs=100,
-          channel_idx=None, channel_dim=None):
-    assert os.path.exists(datapath) #and os.path.isdir(datapath), f"Path {datapath} does not exist or is not a directory"
+          channel_idx=None, channel_dim=None, axes='SYX'):
+    # assert os.path.exists(datapath) #and os.path.isdir(datapath), f"Path {datapath} does not exist or is not a directory"
     # setting up the experiment.
     config = {'datapath':datapath, 'modelpath':modelpath, 'just_eval':just_eval, 'poisson_noise_factor':poisson_noise_factor,
               'gaussian_noise_std':gaussian_noise_std, 'max_epochs':max_epochs, 'channel_idx':channel_idx, 'channel_dim':channel_dim}
@@ -196,7 +196,7 @@ def train(datapath, traindir, just_eval=False,modelpath=None, poisson_noise_fact
         data_type=data_type,
         read_source_func=read_source_func,
         patch_size=(64, 64),
-        axes="SYX",
+        axes=axes,
         batch_size=128,
         dataloader_params={"num_workers": 4},
         )
@@ -238,9 +238,10 @@ if __name__ == '__main__':
     parser.add_argument('--max_epochs', type=int, default=400)
     parser.add_argument('--channel_idx', type=int, default=None)
     parser.add_argument('--channel_dim', type=int, default=None)
+    parser.add_argument('--axes', type=str, default='SYX')
     args = parser.parse_args()
     # list(Path('/group/jug/ashesh/data/expansion_microscopy_v2/').glob('*.czi'))
     train(args.datapath, args.traindir, just_eval=args.just_eval, modelpath=args.modelpath, 
           poisson_noise_factor=args.poisson_noise_factor, gaussian_noise_std=args.gaussian_noise_std,
-          max_epochs=args.max_epochs, channel_idx=args.channel_idx, channel_dim=args.channel_dim)
+          max_epochs=args.max_epochs, channel_idx=args.channel_idx, channel_dim=args.channel_dim, axes=args.axes)
 
