@@ -83,7 +83,17 @@ def select_channels(data_load_fn, channel_idx, channel_dim):
     """
     def wrapper(*args, **kwargs):
         data = data_load_fn(*args, **kwargs)
-        print('Selecting channel:', channel_idx, 'from dim:', channel_dim)
+        if channel_idx >=0:
+            print('Selecting channel:', channel_idx, 'from dim:', channel_dim, 'from data shape:', data.shape)
+        else:
+            assert channel_idx == -1
+            print('Selecting all channels from dim:', channel_dim, 'from data shape:', data.shape)
+        if channel_idx == -1:
+            shape = list(data.shape)
+            shape = tuple(shape[:channel_dim] + shape[channel_dim+1:])
+            data = np.swapaxes(data[None], 0, channel_dim+1)
+            data = data.reshape(data.shape[0] * data.shape[1], *shape[1:])
+            return data
         if channel_dim == 0:
             return data[channel_idx].copy()
         elif channel_dim == 1:
