@@ -6,3 +6,4 @@ pip install -e .
 mamba install lightning -c conda-forge
 pip install wandb
 pip install czifile
+pip install nd2reader

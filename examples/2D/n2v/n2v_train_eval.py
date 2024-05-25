@@ -242,7 +242,7 @@ if __name__ == '__main__':
     parser.add_argument('datapath', type=str)
     parser.add_argument('--modelpath', type=str, default=None)
     parser.add_argument('--just_eval', action='store_true')
-    parser.add_argument('--traindir', type=str, default=os.path.expanduser('~/training/N2V/'))
+    parser.add_argument('--traindir', type=str, default=os.path.expanduser('/group/jug/ashesh/training/N2V/'))
     parser.add_argument('--gaussian_noise_std', type=float, default=0.0)
     parser.add_argument('--poisson_noise_factor', type=float, default=-1)
     parser.add_argument('--max_epochs', type=int, default=400)
